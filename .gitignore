@@ -12,3 +12,4 @@ App_Data
 nuget.exe
 *.sln.ide
 .vs
+.idea
