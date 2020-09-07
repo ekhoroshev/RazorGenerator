@@ -5,7 +5,7 @@
     <PropertyGroup>
         <PrecompileRazorFiles Condition=" '$(PrecompileRazorFiles)' == '' ">true</PrecompileRazorFiles>
         <RazorGeneratorMsBuildPath Condition=" '$(RazorGeneratorMsBuildPath)' == '' ">$(MSBuildThisFileDirectory)\..\tools\RazorGenerator.MsBuild.dll</RazorGeneratorMsBuildPath>
-        <RazorViewsCodeGenDirectory Condition=" '$(RazorViewsCodeGenDirectory)' == '' ">$(MsBuildProjectDirectory)\obj\CodeGen\</RazorViewsCodeGenDirectory>
+        <RazorViewsCodeGenDirectory Condition=" '$(RazorViewsCodeGenDirectory)' == '' ">$(MsBuildProjectDirectory)\</RazorViewsCodeGenDirectory>
       
         <CompileDependsOn Condition=" '$(PrecompileRazorFiles)' == 'true' ">
             PrecompileRazorFiles;
@@ -19,21 +19,9 @@
              <RazorSrcFiles Condition=" '@(RazorSrcFiles)' == '' " Include="**\*.vbhtml;**\*.cshtml" />
         </ItemGroup>
         <ItemGroup>
-            <RazorCsSrcFiles Condition=" '@(RazorCsSrcFiles)' == '' and '%(Extension)' == '.cshtml' "
-                Include="@(RazorSrcFiles)" />
-            <RazorOutputFiles
-                Include="@(RazorCsSrcFiles -> '$(RazorViewsCodeGenDirectory)%(RelativeDir)%(Filename)%(Extension).cs')" />
+            <RazorCsSrcFiles Condition=" '@(RazorCsSrcFiles)' == '' and '%(Extension)' == '.cshtml' " Include="@(RazorSrcFiles)" />
+            <RazorOutputFiles Include="@(RazorCsSrcFiles -> '$(RazorViewsCodeGenDirectory)%(RelativeDir)%(Filename)%(Extension).cs')" />
         </ItemGroup>
-        <ItemGroup>
-            <RazorVbSrcFiles Condition=" '@(RazorVbSrcFiles)' == '' and '%(Extension)' == '.vbhtml' "
-                Include="@(RazorSrcFiles)" />
-            <RazorVbOutputFiles
-                Include="@(RazorVbSrcFiles -> '$(RazorViewsCodeGenDirectory)%(RelativeDir)%(Filename)%(Extension).vb')" />
-         </ItemGroup>
-         <ItemGroup>
-             <RazorSrcFiles Include="@(RazorCsSrcFiles);@(RazorVbSrcFiles)" />
-             <RazorOutputFiles Include="@(RazorCsOutputFiles);@(RazorVbOutputFiles)" />
-         </ItemGroup>
     </Target>
 
     <UsingTask AssemblyFile="$(RazorGeneratorMsBuildPath)" TaskName="RazorCodeGen" />
@@ -47,9 +35,5 @@
                                     RootNamespace="$(RootNamespace)">
             <Output TaskParameter="GeneratedFiles" ItemName="FilesGenerated" />
         </RazorCodeGen>
-        <ItemGroup>
-          <Compile Include="@(FilesGenerated)" Condition=" '@(RazorOutputFiles)' == '' "/>
-          <Compile Include="@(RazorOutputFiles)" />
-        </ItemGroup>
     </Target>
 </Project>

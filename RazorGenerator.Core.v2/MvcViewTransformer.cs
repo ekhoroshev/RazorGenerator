@@ -98,7 +98,7 @@ namespace RazorGenerator.Core
                 {
                     codeTypeReference.BaseType = typeof(ViewStartPage).FullName;
                 }
-                else if (!_languageUtil.IsGenericTypeReference( codeTypeReference.BaseType))
+                else if (!_languageUtil.IsGenericTypeReference(codeTypeReference.BaseType))
                 {
                     // Use the default model if it wasn't specified by the user.
                     codeTypeReference.BaseType = _languageUtil.BuildGenericTypeReference(codeTypeReference.BaseType, new string[]{ _languageUtil.DefaultModelTypeName});

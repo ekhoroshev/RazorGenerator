@@ -11,7 +11,7 @@ using RazorGenerator.Core;
 
 namespace RazorGenerator.MsBuild
 {
-    public class RazorCodeGen : Task
+    public class RazorCodeGen : ITask
     {
         private static readonly Regex _namespaceRegex = new Regex(@"($|\.)(\d)");
         private readonly List<ITaskItem> _generatedFiles = new List<ITaskItem>();
@@ -27,25 +27,35 @@ namespace RazorGenerator.MsBuild
         public string CodeGenDirectory { get; set; }
 
         [Output]
-        public ITaskItem[] GeneratedFiles
-        {
-            get
-            {
-                return _generatedFiles.ToArray();
-            }
-        }
+        public ITaskItem[] GeneratedFiles => _generatedFiles.ToArray();
 
-        public override bool Execute()
+        public bool Execute()
         {
             try
             {
+                Log("RazorGenerator starting!");
                 return ExecuteCore();
             }
             catch (Exception ex)
             {
-                Log.LogError(ex.Message);
+                Log(ex.Message);
             }
             return false;
+        }
+
+        public IBuildEngine BuildEngine { get; set; }
+        public ITaskHost HostObject { get; set; }
+
+        private void Log(string message)
+        {
+            var taskEvent =
+                new BuildMessageEventArgs(
+                    message,
+                    "helpKeyword",
+                    "RazorGenerator",
+                    MessageImportance.High);
+
+            BuildEngine.LogMessageEvent(taskEvent);
         }
 
         private bool ExecuteCore()
@@ -67,40 +77,50 @@ namespace RazorGenerator.MsBuild
 
                     CodeLanguageUtil langutil = CodeLanguageUtil.GetLanguageUtilFromFileName(fileName);
 
-                    string outputPath = Path.Combine(CodeGenDirectory, projectRelativePath.TrimStart(Path.DirectorySeparatorChar)) + langutil.GetCodeFileExtension();
+                    string outputPath = Path.Combine(
+                        CodeGenDirectory,
+                        projectRelativePath
+                            .TrimStart(Path.DirectorySeparatorChar)
+                            .Replace(".cshtml", ".generated")
+                        ) + langutil.GetCodeFileExtension();
+
                     if (!RequiresRecompilation(filePath, outputPath))
                     {
-                        Log.LogMessage(MessageImportance.Low, "Skipping file {0} since {1} is already up to date", filePath, outputPath);
+                        Log($"Skipping file {filePath} since {outputPath} is already up to date");
                         continue;
                     }
                     EnsureDirectory(outputPath);
 
-                    Log.LogMessage(MessageImportance.Low, "Precompiling {0} at path {1}", filePath, outputPath);
+                    Log($"Precompiling {filePath} at path {outputPath}");
                     var host = hostManager.CreateHost(filePath, projectRelativePath, itemNamespace);
 
                     bool hasErrors = false;
                     host.Error += (o, eventArgs) =>
                     {
-                        Log.LogError("RazorGenerator", eventArgs.ErorrCode.ToString(), helpKeyword: "", file: file.ItemSpec,
-                                     lineNumber: (int)eventArgs.LineNumber, columnNumber: (int)eventArgs.ColumnNumber,
-                                     endLineNumber: (int)eventArgs.LineNumber, endColumnNumber: (int)eventArgs.ColumnNumber,
-                                     message: eventArgs.ErrorMessage);
+                        Log(eventArgs.ErrorMessage);
+                        // Log.LogError("RazorGenerator", eventArgs.ErorrCode.ToString(), helpKeyword: "",
+                        //     file: file.ItemSpec,
+                        //     lineNumber: (int) eventArgs.LineNumber,
+                        //     columnNumber: (int) eventArgs.ColumnNumber,
+                        //     endLineNumber: (int) eventArgs.LineNumber,
+                        //     endColumnNumber: (int) eventArgs.ColumnNumber,
+                        //     message: eventArgs.ErrorMessage);
 
                         hasErrors = true;
                     };
 
                     try
                     {
-                        string result = host.GenerateCode();
+                        var result = host.GenerateCode();
+
                         if (!hasErrors)
                         {
-                            // If we had errors when generating the output, don't write the file.
-                            File.WriteAllText(outputPath, result);
+                            File.WriteAllBytes(outputPath, ConvertToBytes(result));
                         }
                     }
                     catch (Exception exception)
                     {
-                        Log.LogErrorFromException(exception, showStackTrace: true, showDetail: true, file: null);
+                        Log(exception.Message);
                         return false;
                     }
                     if (hasErrors)
@@ -116,6 +136,22 @@ namespace RazorGenerator.MsBuild
                 }
             }
             return true;
+        }
+
+        private static byte[] ConvertToBytes(string content)
+        {
+            //Get the preamble (byte-order mark) for our encoding
+            byte[] preamble = Encoding.UTF8.GetPreamble();
+            int preambleLength = preamble.Length;
+
+            byte[] body = Encoding.UTF8.GetBytes(content);
+
+            //Prepend the preamble to body (store result in resized preamble array)
+            Array.Resize<byte>(ref preamble, preambleLength + body.Length);
+            Array.Copy(body, 0, preamble, preambleLength, body.Length);
+
+            //Return the combined byte array
+            return preamble;
         }
 
         /// <summary>
